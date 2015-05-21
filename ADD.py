@@ -108,7 +108,7 @@ class Hand(object):
     # The hands are external components as well, so 
     # that all you need to do is select a hand and switch hands.
 
-    def choose_hand(self):
+    def choose(self):
         if randint(0,1)==0:
             self.foa['hand']='left'
         else:
@@ -119,7 +119,7 @@ class Hand(object):
         trp(3,'Looking to the %s hand.' % self.foa['hand'])
         self.report()
     
-    def swap_hands(self):
+    def swap(self):
 
         if self.foa['hand']=='left':
             self.foa['hand']='right'
@@ -171,8 +171,7 @@ def clear_eb():
 def end():
     global SOLUTION_COMPLETED
     SOLUTION_COMPLETED = True
-
-
+            
 # Raise is an important heart of this process.  The question is how
 # to do the test-for-done.  That is, when putting up fingers, how
 # does the child know when he's got the right number up?  In this
@@ -187,22 +186,105 @@ def end():
 # This buffer is cleared by raise2 itself, and is used for the done
 # test.
 
+def exec_op(op):
+    trp(2,'Doing:(%s)' % op)
+    #mempush (exect_op, lisp op)
+    #funcall (car op)
 
+# This version of raise assumes that hand control is done by the caller.
 
+def raise_hand():
+    global CB, ADDEND
+    CB = 0
+
+    while True:
+        say_next()
+        HAND.put_up()
+        HAND.increment_focus()
+        CB+=1
+        if CB == ADDEND:
+            break
+        
+def count_fingers():
+    for i in range(5):
+        look_n_count()
+
+def look_n_count():
+    if HAND.s[HAND.foa['hand']][HAND.foa['finger']] == 'u':
+        say_next()
+    else:
+        HAND.increment_focus()
+
+# Finally we need to replace the n1 and n2 with echoic buffers so
+# that they aren't arguments to a lisp function. This also requires
+# putting the addends into external stores which, like the hands,
+# can be attended.  Instead of doing all that I just assume here
+# that the problem is written on an external board, and that there
+# is a sort of second set of eyes that can look at one or the other
+# addend, and swap them, just like with the hands.  We ought to
+# organize all the different buffers.  I wonder if kids ever get
+# these mixed up, and if not, why not?
+
+class Addend(object):
+    def __init__(self,ad1,ad2):
+        self.ad1 = ad1
+        self.ad2 = ad2
+        self.addend = 0
+        self.cla = ''
+        
+    def choose(self):
+        if randint(0,1) == 0:
+            self.addend = self.ad1
+            self.addend = self.ad2
+        # Indicate which addend we've chosen for min discovery.
+        
+        if self.ad1==self.ad2:
+            self.cla = 'equal'
+        elif ((self.addend==self.ad1) and (self.ad1>self.ad2)) or ((self.addend==self.ad2) and (self.ad1<self.ad2)):
+            self.cla = 'larger'
+        else:
+            self.cla = 'smaller'
+        trp(3, 'Choose addend %s.' % self.addend)
+        
+        
+    def swap(self):
+        if self.addend == self.ad1:
+            self.addend = self.ad2
+            #mempush (swap_addends, from 1 to 2)
+        else:
+            self.addend = self.ad1
+            #mempush (swap_addeds, from 2 to 1)
+        trp(3, 'Looking to the other addend %s.' % self.addend)
+    
+    def say(self):
+        say(self.addend)
+    
+    def choose_larger(self):
+        if self.ad1>self.ad2:
+            self.addend = self.ad1
+        else:
+            self.addend = self.ad2
+        
+        if self.ad1 == self.ad2:
+            self.cla = 'equal'
+        else:
+            self.cla = 'larger'
+        trp(3, 'Choose addend %s.' % self.addend)
 
 
 def main():
     
-    global TL,FOA
+    global TL, HAND, CB, EB, PERR, SOLUTION_COMPLETED, ADDEND, AD1, AD2, CLA
     TL=5 #trace level -- 0 means off
     
     HAND = Hand()
     
-    # The echoic buffer. 
+    #| The echoic buffer. |#
     
     EB=0
     
-
+    
+              
 
 if __name__ == "__main__":
     main()
