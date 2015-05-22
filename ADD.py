@@ -57,10 +57,13 @@ class Hand(object):
         
         # The fingers memory structure; five on each of two hands, 
         # each of which my be up or down.
+        
         self.s = {'left':['']*5,'right':['']*5}
         
         #| The focus of attention may point at a particular finger, or may be nil. |#
+        
         self.foa = {'hand':'','finger':0}
+        self.hand = ''
     
     def clear(self):
         self.s['left'] = ['d']*5
@@ -69,19 +72,18 @@ class Hand(object):
     # Basic operations; most of which operate on what's in foa.
     
     def increment_focus(self):
-        if (self.foa['hand']=='right') and (self.foa['finger']==4):
-            print "Error: foa right hand >4"
-            return
-            
-        # If we're done the left hand, move on to the rigt.
-        if (self.foa['hand']=='left') and (self.foa['finger']==4):
-            self.foa['hand']='right'
-            self.foa['finger']=0
-            
-        # Else shift to the next finger.
-        else:
-            self.foa['finger']+=1
+        if not((self.foa['hand']=='right') and (self.foa['finger']==4)):
         
+            # If we're done the left hand, move on to the rigt.
+            
+            if (self.foa['hand']=='left') and (self.foa['finger']==4):
+                self.foa['hand']='right'
+                self.foa['finger']=0
+                
+            # Else shift to the next finger.
+            
+            else:
+                self.foa['finger']+=1
         self.report()
     
     # This is just a reporting function (and helpers).  The fingers are
@@ -90,13 +92,12 @@ class Hand(object):
     
     def report(self):
         text=''
-        for i in ['right','left']:
+        for i in ['left','right']:
             for j in range(5):
                 if (i==self.foa['hand'] and j ==self.foa['finger']):
                     text+=self.s[i][j].upper()
                 else:
-                    text+=self.s[i][j]
-                
+                    text+=self.s[i][j]   
         text=text[:5]+'|'+text[5:]
         trp(4,text)
     
@@ -110,25 +111,24 @@ class Hand(object):
 
     def choose(self):
         if randint(0,1)==0:
-            self.foa['hand']='left'
+            self.hand='left'
         else:
-            self.foa['hand']='right'
-        
-        self.foa['finger']=0
-        
-        trp(3,'Looking to the %s hand.' % self.foa['hand'])
+            self.hand='right' 
+        trp(3,'Looking to the %s hand.' % self.hand)
+        self.foa['hand'] = self.hand
+        self.foa['finger'] = 0
         self.report()
     
     def swap(self):
-
-        if self.foa['hand']=='left':
-            self.foa['hand']='right'
+        if self.hand == 'left':
+            self.hand='right'
             #mempush(swap-hands, from left to right)
         else:
-            self.foa['hand']='left'
+            self.hand='left'
             #mempush(swap-hands, from right to left)
-        
-        trp(3,'Looking to the %s hand.' % self.foa['hand'])
+        trp(3,'Looking to the %s hand.' % self.hand)
+        self.foa['hand'] = self.hand
+        self.foa['finger'] = 0
         self.report()
 
 
@@ -149,7 +149,6 @@ def say(n):
     #mempush(say, list n) 
 
 def say_next():
-    global EB,PERR
     if EB==0:
         say(1)
     elif PERR>randint(1,100):
@@ -194,15 +193,14 @@ def exec_op(op):
 # This version of raise assumes that hand control is done by the caller.
 
 def raise_hand():
-    global CB, ADDEND
+    global CB
     CB = 0
-
     while True:
         say_next()
         HAND.put_up()
         HAND.increment_focus()
         CB+=1
-        if CB == ADDEND:
+        if CB == ADDEND.addend:
             break
         
 def count_fingers():
@@ -212,8 +210,7 @@ def count_fingers():
 def look_n_count():
     if HAND.s[HAND.foa['hand']][HAND.foa['finger']] == 'u':
         say_next()
-    else:
-        HAND.increment_focus()
+    HAND.increment_focus()
 
 # Finally we need to replace the n1 and n2 with echoic buffers so
 # that they aren't arguments to a lisp function. This also requires
@@ -226,16 +223,19 @@ def look_n_count():
 # these mixed up, and if not, why not?
 
 class Addend(object):
+    
     def __init__(self,ad1,ad2):
         self.ad1 = ad1
         self.ad2 = ad2
         self.addend = 0
         self.cla = ''
-        
+
     def choose(self):
         if randint(0,1) == 0:
             self.addend = self.ad1
+        else:
             self.addend = self.ad2
+            
         # Indicate which addend we've chosen for min discovery.
         
         if self.ad1==self.ad2:
@@ -245,8 +245,7 @@ class Addend(object):
         else:
             self.cla = 'smaller'
         trp(3, 'Choose addend %s.' % self.addend)
-        
-        
+
     def swap(self):
         if self.addend == self.ad1:
             self.addend = self.ad2
@@ -272,19 +271,56 @@ class Addend(object):
         trp(3, 'Choose addend %s.' % self.addend)
 
 
+
+''' leaving space for line 1697-2304'''
+
+
+#Here's are the actual strategies.
+
+def count_from_one_twice():
+    
+    # First addend on first hand.
+    
+    HAND.clear()
+    HAND.choose()
+    ADDEND.choose()
+    ADDEND.say()
+    clear_eb()
+    raise_hand()
+    
+    # Second addend on the other hand.
+    
+    HAND.swap()
+    ADDEND.swap()
+    ADDEND.say()
+    clear_eb()
+    raise_hand()
+    
+    #Final count out.
+    
+    HAND.choose()
+    clear_eb()
+    count_fingers()
+    HAND.swap()
+    count_fingers()
+    
+    end()
+
+def test():
+    global HAND, CB, EB, PERR, ADDEND
+    
+    PERR = 0
+    HAND = Hand()
+    ADDEND = Addend(3,4)
+    count_from_one_twice()
+
 def main():
     
     global TL, HAND, CB, EB, PERR, SOLUTION_COMPLETED, ADDEND, AD1, AD2, CLA
     TL=5 #trace level -- 0 means off
     
-    HAND = Hand()
+    test()
     
-    #| The echoic buffer. |#
-    
-    EB=0
-    
-    
-              
 
 if __name__ == "__main__":
     main()
