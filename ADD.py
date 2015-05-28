@@ -1,43 +1,9 @@
-from random import randint
+from random import randint, shuffle, random
+import os
+import csv
+import matplotlib.pyplot as plt
 
 # ----- Operators for actual addition strategies and test routines.
-
-'''
-There are the following systems herein:
-
-   1. The experimenter chooses problems, presents them, handles
-      cycling the world, and gives feedback on results of addition.
-
-   2. ASCM (more correctly, the LMT module) knows the specific high
-      level structure of each strategy, and carries with each a memory
-      strength value.  Each time the memory system is referenced (by
-      the cognitive system), the referred-to elements get their
-      strengths increased.  This principle gives us an account of the
-      basic memory effects: (a) whenever a strategy is used (whether
-      it works or not) its strenght is increased.  (b) when a strategy
-      gets the right answer, it is increased again (by viture of the
-      cognitivie system getting rewarded and so sort of patting the
-      strategy on the head), and (c) when a new strategy is entered,
-      it gets very high strength points (because there's a lot of
-      memory interaction involved in entering it into the memory).
-
-   3. The performance system knows how to do the specific things that
-      come with goals (as stored in the memory to describe a
-      strategy).
-
-   4. The cognitive system gets the problem, computes its features,
-      probes ASCM for a strategy, gets the goals for the selected
-      strategy from the memory, sets the peripheral system off on the
-      first of these and then monitors performance as the process
-      takes place.  When the answer appears (in an echoic buffer at
-      the end of the run) the cognitive system reports this to the
-      experimenter, gets the right or wrong feedback, and then, if the
-      answer was correct, pats ASCM on the head.  The cognitive system
-      also permanently knows the general structure of a good addition
-      strategy.  This is coded into the cognitive system and never
-      changes.
-'''
-
 
 # General utilities for reporting, etc.
 
@@ -58,12 +24,12 @@ class Hand(object):
         # The fingers memory structure; five on each of two hands, 
         # each of which my be up or down.
         
-        self.s = {'left':['']*5,'right':['']*5}
+        self.s = {'left':['d']*5,'right':['d']*5}
         
-        #| The focus of attention may point at a particular finger, or may be nil. |#
+        # The focus of attention.
         
-        self.foa = {'hand':'','finger':0}
-        self.hand = ''
+        self.foa = {'hand':'left','finger':0}
+        self.hand = 'left'
     
     def clear(self):
         self.s['left'] = ['d']*5
@@ -131,11 +97,10 @@ class Hand(object):
         self.foa['finger'] = 0
         self.report()
 
-
 # Maipulation in the echoic buffer where number facts live.  We
 # assume perfect knowledge of the number sequence.  That way incr
 # and decr can be used.  This is where all possible errors come into
-# the picture.  There is a probability (*perr*) of say-next
+# the picture.  There is a probability (PERR) of say-next
 # reporting the WRONG number; this always takes place by simply
 # failing to count.  Note that there are really a number of ways
 # that one can get errors in addition, but the basic effect of
@@ -151,7 +116,7 @@ def say(n):
 def say_next():
     if EB==0:
         say(1)
-    elif PERR>randint(1,100):
+    elif PERR>random():
         say(EB)
     else:
         say(EB+1)
@@ -168,8 +133,9 @@ def clear_eb():
 # This tells the driver to stop.
 
 def end():
-    global SOLUTION_COMPLETED
+    global SOLUTION_COMPLETED, SOLUTION
     SOLUTION_COMPLETED = True
+    SOLUTION = EB
             
 # Raise is an important heart of this process.  The question is how
 # to do the test-for-done.  That is, when putting up fingers, how
@@ -200,7 +166,7 @@ def raise_hand():
         HAND.put_up()
         HAND.increment_focus()
         CB+=1
-        if CB == ADDEND.addend:
+        if CB >= ADDEND.addend:
             break
         
 def count_fingers():
@@ -229,7 +195,7 @@ class Addend(object):
         self.ad2 = ad2
         self.addend = 0
         self.cla = ''
-
+        
     def choose(self):
         if randint(0,1) == 0:
             self.addend = self.ad1
@@ -245,7 +211,7 @@ class Addend(object):
         else:
             self.cla = 'smaller'
         trp(3, 'Choose addend %s.' % self.addend)
-
+        
     def swap(self):
         if self.addend == self.ad1:
             self.addend = self.ad2
@@ -270,57 +236,380 @@ class Addend(object):
             self.cla = 'larger'
         trp(3, 'Choose addend %s.' % self.addend)
 
+#Here are the actual strategies.
 
-
-''' leaving space for line 1697-2304'''
-
-
-#Here's are the actual strategies.
-
-def count_from_one_twice():
+def count_from_one_twice_strategy():
+    return [
     
     # First addend on first hand.
     
-    HAND.clear()
-    HAND.choose()
-    ADDEND.choose()
-    ADDEND.say()
-    clear_eb()
-    raise_hand()
+    HAND.clear,
+    HAND.choose,
+    ADDEND.choose,
+    ADDEND.say,
+    clear_eb,
+    raise_hand,
     
     # Second addend on the other hand.
     
-    HAND.swap()
-    ADDEND.swap()
-    ADDEND.say()
-    clear_eb()
-    raise_hand()
+    HAND.swap,
+    ADDEND.swap,
+    ADDEND.say,
+    clear_eb,
+    raise_hand,
     
     #Final count out.
     
-    HAND.choose()
-    clear_eb()
-    count_fingers()
-    HAND.swap()
-    count_fingers()
-    
-    end()
+    HAND.choose,
+    clear_eb,
+    count_fingers,
+    HAND.swap,
+    count_fingers,
+    end]
 
-def test():
-    global HAND, CB, EB, PERR, ADDEND
+def count_from_one_once_strategy():
+    return [    
     
-    PERR = 0
+    # First addend on first hand.
+
+    HAND.clear,
+    HAND.choose,
+    ADDEND.choose,
+    ADDEND.say,
+    clear_eb,
+    raise_hand,
+
+    # Second addend on the other hand.
+
+    HAND.swap,
+    ADDEND.swap,
+    raise_hand,
+    end]
+    
+def count_from_either_strategy():
+    return [    
+    
+    # Count from the first addend.
+
+    ADDEND.choose,
+    ADDEND.say,
+
+    # Second addend on a hand.
+    
+    HAND.clear,
+    HAND.choose,
+    ADDEND.swap,
+    raise_hand,
+    end]
+
+def min_strategy():
+    return [    
+    
+    # Count from the larger addend.
+
+    ADDEND.choose_larger,
+    ADDEND.say,
+
+    # Second addend on a hand.
+    
+    HAND.clear,
+    HAND.choose,
+    ADDEND.swap,
+    raise_hand,
+    end]
+
+def random_strategy():
+    
+    list_of_operations = [
+    HAND.clear, HAND.clear,
+    HAND.choose, HAND.choose, 
+    ADDEND.choose, ADDEND.choose,
+    ADDEND.say, ADDEND.say,
+    clear_eb, clear_eb, 
+    raise_hand, raise_hand, 
+    HAND.swap, HAND.swap, 
+    ADDEND.swap, ADDEND.swap, 
+    count_fingers, count_fingers,
+    end]
+    
+    shuffle(list_of_operations)
+    return list_of_operations
+
+# Try retrieval first; if fails, initialize hand, echoic buffer and 
+# counting buffer,and carry out the strategy.
+# Update memory and distribution table at the end.
+
+def exec_strategy(strategy_choice):
+    global HAND, CB, EB, SOLUTION_COMPLETED, SOLUTION
+    
+    # Try retrieval.
+    
+    SOLUTION_COMPLETED = False
+    retrieval = APSM.guess(ADDEND.ad1,ADDEND.ad2)
+    
+    if retrieval != None:
+        SOLUTION_COMPLETED = True
+        SOLUTION = retrieval
+        trp(1, "Used retrieval")
+    
+    EB = 0
+    CB = 0
     HAND = Hand()
-    ADDEND = Addend(3,4)
-    count_from_one_twice()
+    
+    # Get the list of operations from the strategy.
+    
+    list_of_operations = strategy_choice()
+    
+    # Carry out the operations.
+    
+    for i in list_of_operations:
+        if SOLUTION_COMPLETED:
+            break
+        i()
+    
+    # Update APSM and DSTR tables.
+    
+    APSM.update (ADDEND.ad1, ADDEND.ad2, SOLUTION)
+    DSTR.update (ADDEND.ad1, ADDEND.ad2, SOLUTION)
+    trp(1, "Solution = %s" % SOLUTION)
+
+# Multiple (standard) strategies and Strategy Choice Algorithm (SCA). 
+# For the moment, this will just be random.
+
+def SCA():
+    exec_strategy(random_strategy())
+
+
+# Problem Presentation Algorithm (PPA). 
+# Again, just random for now.
+
+def PPA():
+    global ADDEND
+    ADDEND = Addend(randint(1,5),randint(1,5))
+    trp(1, "%s + %s = ?" % (ADDEND.ad1, ADDEND.ad2))
+
+# Associative Problem->Solution Memory (APSM) For the moment
+# this will just a table that counts the number of times each
+# problem leads to each solution. APSM will be pre-loaded with
+# a small tendency to recall n+1 for m+n problems (i.e., 3+4 
+# give a small bump to 5).
+
+
+''' 960514 - Added direct recall memory.  This is stored in an
+associative array, just like in Siegler & Shrager, and is updated
+at problem conclusion time, just like Siegler and Shrager.  And,
+just like... it is consulted ... um, okay, so this is different;
+it's consulted first, and then only when the cognitive system has
+some time with nothing to do.  Note that the array is actually one
+wider in each direction than the possible solutions; the zero index
+isn't used. '''
+
+class Apsm(object):
+    
+    def __init__(self):
+        self.table = [[[0.01 for x in range(11)] for x in range(6)] for x in range(6)]
+        
+        # Set in place all the 1+ problems with small positive associations.
+
+        for i in range(1,6):
+            self.table[i][1][i+1] += 0.05
+            self.table[1][i][i+1] += 0.05
+        
+        # And all the run-on problems (like 1+2=3)
+        
+        for i in range(1,5):
+            self.table[i][i+1][i+2] += 0.05
+    
+    # When the problem is completed, update the memory table
+    # appropriately depending upon whether we got it right or wrong.
+    # Ignore the results of challenge problems. 
+    
+    def update(self, a1, a2, result):
+        if (a1>5) or (a2>5) or (result>10):
+            trp(1,"Addends (%s+%s) or result (%s) is/are larger than the memory table limits -- Ignored!" % (a1,a2,result))
+        else:
+            if a1 + a2 == result:
+                self.table[a1][a2][result] += INCR_RIGHT
+            else:
+                self.table[a1][a2][result] += INCR_WRONG   
+    
+    # Print the table.
+        
+    def show(self):
+        for i in range(1,6):
+            for j in range(1,6):
+                print "%s + %s = " % (i,j) ,
+                for k in range(1,11):
+                    print "%s (%s), " % (k, self.table[i][j][k]),
+                print
+            print
+    
+    # Pick at random from among the results that come above the cc, or
+    # return None if nothing comes over the cc.
+    
+    def guess(self,a1,a2):
+        if (a1>5) or (a2>5):
+            return (None)
+        
+        cc = RETRIEVAL_LOW_CC + (RETRIEVAL_HIGH_CC - RETRIEVAL_LOW_CC) * random()
+        trp(1, "Choose confidence criterion = %s" % cc)
+        
+        results_above_cc = []
+        
+        for i in range(1,11):
+            if self.table[a1][a2][i] >= cc:
+                results_above_cc.append(i)
+        
+        l = len(results_above_cc)
+        if l>0:
+            return (results_above_cc[randint(0,l-1)])
+        return (None)
+
+# Answer distribution table
+
+class Distribution(object):
+    
+    # Record answers ranging from 0 to 11; 12 includes all other answers.
+    
+    def __init__(self):
+        self.table= [[[0 for x in range(13)] for x in range(6)] for x in range(6)]
+    
+    # Update the distribution table when a new answer is generated.
+    
+    def update(self, a1, a2, result):
+        if (a1>5) or (a2>5):
+            trp(1,"Addends (%s+%s) is/are larger than the distribution table limits -- Ignored!" % (a1,a2))
+            return
+        
+        if result not in range(12):
+            self.table[a1][a2][12] +=1
+        else:
+            self.table[a1][a2][result] +=1   
+    
+    # Calculate relative frequency, return blank string when frequency is zero
+    # so that the table looks clean when printed.
+    
+    def relative_frequency(self,a1,a2,result):
+        s = sum(self.table[a1][a2])
+        if (s == 0) or (self.table[a1][a2][result] == 0):
+            return ''
+        else:
+            return round(float(self.table[a1][a2][result])/s, 2)
+            
+    # Same function but return zero when frequency is zero so that 
+    # it can be plotted into graphs.
+    
+    def relative_frequency1(self,a1,a2,result):
+        s = sum(self.table[a1][a2])
+        if s == 0:
+            return 0
+        else:
+            return float(self.table[a1][a2][result])/s
+    
+    # Convert the whole frequency table to relative frequency.
+    
+    def relative_table(self,relative):  
+        if relative:
+            return [[[self.relative_frequency(x,y,z) for z in range(13)] for y in range(6)] for x in range(6)]
+        else:
+            return [[[self.table[x][y][z] for z in range(13)] for y in range(6)] for x in range(6)]
+    
+    # Print the table.
+    
+    def show(self,relative = False):
+        table = self.relative_table(relative)
+            
+        for i in range(1,6):
+            for j in range(1,6):
+                print "%s + %s = " % (i,j) ,
+                for k in range(13):
+                    print "%s (%s), " % (k, table[i][j][k]),
+                print
+            print
+    
+    # Export to csv file.
+    
+    def print_csv(self,relative = False):
+        table = self.relative_table(relative)
+        
+        with open(os.path.join(os.path.dirname(__file__), 'DistributionTable.csv'),'wb') as csvfile:
+            writer = csv.writer(csvfile)
+            
+            writer.writerow(['PROBLEM','ANSWER'])
+            writer.writerow(['']+[str(x) for x in range(12)]+['OTHER'])
+            for i in range(1,6):
+                for j in range(1,6):
+                    writer.writerow(["%s + %s = " % (i,j)]+[table[i][j][k] for k in range(13)])
+    
+    # Plot the distribution table into bar charts.
+    
+    def bar_plot(self, relative = False):
+        if relative:
+            table = [[[self.relative_frequency1(x,y,z) for z in range(13)] for y in range(6)] for x in range(6)]
+        
+        else:
+            table = [[[self.table[x][y][z] for z in range(13)] for y in range(6)] for x in range(6)]
+        
+        maxheight = max([max([max(table[x][y]) for x in range(6)]) for y in range(6)])
+        
+        plt.figure()
+        
+        for i in range(1,6):
+            for j in range(1,6):
+                ax=plt.subplot(5,5,(i-1)*5+j)
+                plt.bar([x-0.4 for x in range(13)],table[i][j],linewidth=0,color="steelblue")
+                plt.xlim(-0.5,12.5)
+                plt.ylim(0, maxheight*1.1)
+                plt.text(.5,1.03,"%s + %s" % (i,j), horizontalalignment='center', transform=ax.transAxes)
+                plt.tick_params(\
+                    axis='both',
+                    which='both',
+                    bottom='off',
+                    top='off',
+            	    left='off',
+                    right='off',
+                    labelleft='on',
+                    labelbottom='on',labelsize=8)
+        plt.tight_layout(h_pad=1)
+        plt.show()
+
+def test(n_times,strategy_choice):
+    global APSM, DSTR
+    
+    # Set up the solution memory table and the answer distribution table
+    
+    APSM = Apsm()
+    DSTR = Distribution()
+    
+    # Randomly generate a problem and execute the chosen strategy to solve it.
+    # Repeat n times.
+    
+    for i in range(n_times):
+        PPA()
+        exec_strategy(strategy_choice)
+    
+    #Output the distribution table.
+    
+    DSTR.show(relative = True)
+    DSTR.print_csv(relative = True)
+    DSTR.bar_plot(relative = True)
 
 def main():
+    global TL, PERR, RETRIEVAL_LOW_CC, RETRIEVAL_HIGH_CC
+    global INCR_RIGHT, INCR_WRONG
+    TL=0 # Trace level -- 0 means off
     
-    global TL, HAND, CB, EB, PERR, SOLUTION_COMPLETED, ADDEND, AD1, AD2, CLA
-    TL=5 #trace level -- 0 means off
+    PERR = 0.04 # Probability of counting error (missing a count).
+    INCR_RIGHT = 0.06 # Add this to solution memory when you get a problem right
+    INCR_WRONG = 0.03 # Add this when you get one wrong
     
-    test()
+    # Retrieval cc ranges are used in select-strategy to determine when
+    # to actually choose retrieval (via setting the cc randomly).
     
+    RETRIEVAL_LOW_CC = 0.1
+    RETRIEVAL_HIGH_CC = 0.9
+    
+    test(1000,random_strategy)   
 
 if __name__ == "__main__":
     main()
